@@ -26,6 +26,7 @@ from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.aws import util
 if TYPE_CHECKING:
   from perfkitbenchmarker.providers.aws import aws_virtual_machine  # pylint: disable=g-import-not-at-top
@@ -84,6 +85,11 @@ class S3Service(object_storage_service.ObjectStorageService):
   zone_id: str | None = None
 
   def PrepareService(self, location):
+    if aws_flags.S3_ENDPOINT_URL.value:
+      # Region names of S3-compatible services (e.g. "auto" on R2) do not
+      # follow the AWS format, so skip validation and zone lookups.
+      self.region = location or DEFAULT_AWS_REGION
+      return
     if not location:
       self.region = DEFAULT_AWS_REGION
     elif util.IsRegion(location):
@@ -99,6 +105,15 @@ class S3Service(object_storage_service.ObjectStorageService):
     return f'--{self.zone_id}--x-s3'
 
   def MakeBucket(self, bucket_name, raise_on_failure=True, tag_bucket=True):
+    if aws_flags.S3_ENDPOINT_URL.value:
+      # The bucket on an S3-compatible service is managed outside of PKB. This
+      # also keeps the aws CLI from creating a bucket in the real AWS account.
+      logging.info(
+          'Using existing bucket %s at %s.',
+          bucket_name,
+          aws_flags.S3_ENDPOINT_URL.value,
+      )
+      return
     if self.zone and not bucket_name.endswith(self.S3ExpressZonalSuffix()):
       raise errors.Benchmarks.BucketCreationError(
           f'S3 Express Buckets in zone {self.zone_id} must end with '
@@ -247,6 +262,8 @@ class S3Service(object_storage_service.ObjectStorageService):
   @vm_util.Retry()
   def DeleteBucket(self, bucket):
     """See base class."""
+    if aws_flags.S3_ENDPOINT_URL.value:
+      return
 
     def _SuppressFailure(stdout, stderr, retcode):
       """Suppresses failure when bucket does not exist."""
@@ -269,6 +286,8 @@ class S3Service(object_storage_service.ObjectStorageService):
     )
 
   def EmptyBucket(self, bucket):
+    if aws_flags.S3_ENDPOINT_URL.value:
+      return
     vm_util.IssueCommand([
         'aws',
         's3',
@@ -307,7 +326,9 @@ class S3Service(object_storage_service.ObjectStorageService):
   UPLOAD_HTTP_METHOD = 'PUT'
 
   def PrepareVM(self, vm: 'aws_virtual_machine.AwsVirtualMachine'):
-    if not vm.instance_profile:
+    # With --s3_endpoint_url the VM may not be on EC2 (e.g. a Kubernetes pod);
+    # boto3 reads credentials from its environment instead.
+    if not aws_flags.S3_ENDPOINT_URL.value and not vm.instance_profile:
       raise ValueError('--aws_ec2_instance_profile is required to access s3.')
 
     vm.Install('awscli')
@@ -325,14 +346,22 @@ class S3Service(object_storage_service.ObjectStorageService):
     return vm.RemoteCommand('time aws s3 sync s3://%s/ %s' % (bucket, dest))
 
   def Metadata(self, vm):
-    return {
+    metadata = {
         object_storage_service.BOTO_LIB_VERSION: (
             linux_packages.GetPipPackageVersion(vm, 'boto3')
         )
     }
+    if aws_flags.S3_ENDPOINT_URL.value:
+      metadata['s3_endpoint_url'] = aws_flags.S3_ENDPOINT_URL.value
+    return metadata
 
   def APIScriptArgs(self):
-    return ['--region=' + self.region]
+    args = ['--region=' + self.region]
+    if aws_flags.S3_ENDPOINT_URL.value:
+      args.append('--endpoint_url=' + aws_flags.S3_ENDPOINT_URL.value)
+      if aws_flags.S3_ADDRESSING_STYLE.value:
+        args.append('--addressing_style=' + aws_flags.S3_ADDRESSING_STYLE.value)
+    return args
 
   @classmethod
   def APIScriptFiles(cls):

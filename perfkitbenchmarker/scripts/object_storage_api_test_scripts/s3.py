@@ -20,6 +20,7 @@ import time
 
 from absl import flags
 import boto3
+from botocore import config as botocore_config
 # This is the path that we SCP object_storage_interface to.
 from providers import object_storage_interface
 import six
@@ -31,7 +32,23 @@ class S3Service(object_storage_interface.ObjectStorageServiceBase):
   """An interface to AWS S3, using the boto library."""
 
   def __init__(self):
-    self.client = boto3.client('s3', region_name=FLAGS.region)
+    if not FLAGS.endpoint_url:
+      self.client = boto3.client('s3', region_name=FLAGS.region)
+      return
+    # S3-compatible services (OSS, R2) may reject the CRC checksums that
+    # recent botocore versions add by default, so only send them when the
+    # operation requires one.
+    client_config = botocore_config.Config(
+        s3={'addressing_style': FLAGS.addressing_style or 'auto'},
+        request_checksum_calculation='when_required',
+        response_checksum_validation='when_required',
+    )
+    self.client = boto3.client(
+        's3',
+        region_name=FLAGS.region,
+        endpoint_url=FLAGS.endpoint_url,
+        config=client_config,
+    )
 
   def ListObjects(self, bucket, prefix):
     return self.client.list_objects_v2(Bucket=bucket, Prefix=prefix)

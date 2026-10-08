@@ -374,6 +374,11 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     if resource_body:
       container['resources'] = resource_body
 
+    if k8s_flags.ENV_FROM_SECRET.value:
+      container['envFrom'] = [
+          {'secretRef': {'name': k8s_flags.ENV_FROM_SECRET.value}}
+      ]
+
     # Tail /dev/null as a means of keeping the container alive.
     container['command'] = ['tail', '-f', '/dev/null']
 

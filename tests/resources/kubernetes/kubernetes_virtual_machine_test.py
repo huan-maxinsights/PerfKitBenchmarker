@@ -340,6 +340,23 @@ class KubernetesResourcesTestCase(BaseKubernetesVirtualMachineTestCase):
       actual = kub_vm.GetResourceMetadata()
       self.assertEqual(actual, {**actual, **subset_of_expected_metadata})
 
+  @flagsaver.flagsaver(k8s_env_from_secret='s3-creds')
+  def testContainerEnvFromSecret(self):
+    spec = self.create_virtual_machine_spec()
+    with patch_critical_objects():
+      kub_vm = TestKubernetesVirtualMachine(spec)
+      container = kub_vm._BuildContainerBody()
+    self.assertEqual(
+        container['envFrom'], [{'secretRef': {'name': 's3-creds'}}]
+    )
+
+  def testContainerWithoutEnvFromSecret(self):
+    spec = self.create_virtual_machine_spec()
+    with patch_critical_objects():
+      kub_vm = TestKubernetesVirtualMachine(spec)
+      container = kub_vm._BuildContainerBody()
+    self.assertNotIn('envFrom', container)
+
 
 class KubernetesVirtualMachineOsTypesTestCase(
     BaseKubernetesVirtualMachineTestCase

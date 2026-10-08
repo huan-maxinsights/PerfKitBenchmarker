@@ -100,3 +100,11 @@ USE_NODE_SELECTORS = flags.DEFINE_bool(
     'Whether to require node selectors to be present when creating K8s VMs. '
     'Disable this if you are using a pre-existing k8s cluster without labels.',
 )
+ENV_FROM_SECRET = flags.DEFINE_string(
+    'k8s_env_from_secret',
+    None,
+    'Name of a Secret in the pod namespace whose keys are exposed to K8s VMs '
+    'as environment variables, e.g. AWS_ACCESS_KEY_ID and '
+    'AWS_SECRET_ACCESS_KEY for --s3_endpoint_url. Keeps credentials out of '
+    'PKB flags and VM files.',
+)

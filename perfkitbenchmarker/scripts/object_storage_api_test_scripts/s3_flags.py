@@ -17,3 +17,15 @@
 from absl import flags
 
 flags.DEFINE_string('region', None, 'The S3 region to use.')
+flags.DEFINE_string(
+    'endpoint_url',
+    None,
+    'Endpoint URL of an S3-compatible service (e.g. Aliyun OSS, Cloudflare '
+    'R2). If unset, AWS S3 is used.',
+)
+flags.DEFINE_enum(
+    'addressing_style',
+    None,
+    ['auto', 'virtual', 'path'],
+    'S3 bucket addressing style. Only used with --endpoint_url.',
+)

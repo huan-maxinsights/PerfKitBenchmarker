@@ -431,3 +431,18 @@ flags.DEFINE_string(
     ' specified, defaults to'
     ' arn:aws:iam::{account}:instance-profile/ecsInstanceRole.',
 )
+S3_ENDPOINT_URL = flags.DEFINE_string(
+    's3_endpoint_url',
+    None,
+    'Endpoint URL of an S3-compatible service (e.g. Aliyun OSS, Cloudflare'
+    ' R2) used with --storage=AWS. In this mode the bucket must already exist'
+    ' (pass it via --object_storage_bucket_name): PKB does not create, empty'
+    ' or delete it, and credentials come from the VM environment instead of'
+    ' --aws_ec2_instance_profile.',
+)
+S3_ADDRESSING_STYLE = flags.DEFINE_enum(
+    's3_addressing_style',
+    None,
+    ['auto', 'virtual', 'path'],
+    'S3 bucket addressing style. Only used with --s3_endpoint_url.',
+)
