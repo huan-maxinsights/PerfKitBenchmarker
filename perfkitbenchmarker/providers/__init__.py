@@ -51,6 +51,10 @@ def LoadProviderFlags(providers):
 
 # Import flag definitions for all cloud providers.
 LoadProviderFlags(provider_info.PROVIDER_DIRECTORY_NAMES)
+# Kubernetes lives under resources/ since it moved out of providers/, so
+# LoadProviderFlags no longer finds its flags; register them explicitly so that
+# flags such as --kubernetes_anti_affinity can be set on the command line.
+importlib.import_module('perfkitbenchmarker.resources.kubernetes.flags')
 
 
 def LoadProviderUtils(cloud: str) -> types.ModuleType:
